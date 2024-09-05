@@ -4,11 +4,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { PlusIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Auth } from "@/components/Auth";
-import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { useState } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,7 +27,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { databases, account, DATABASE_ID, COLLECTION_ID } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { useEffect } from "react";
-import { AppwriteException } from 'appwrite';
+import { AppwriteException } from "appwrite";
+import axios from "axios";
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -29,10 +41,7 @@ export default function Home() {
       const response = await databases.listDocuments(
         DATABASE_ID,
         COLLECTION_ID,
-        [
-          Query.orderDesc("$createdAt"),
-          Query.limit(10)
-        ]
+        [Query.orderDesc("$createdAt"), Query.limit(10)]
       );
       setReports(response.documents);
     } catch (error) {
@@ -52,20 +61,35 @@ export default function Home() {
     const [subtype, setSubtype] = useState("");
     const [severity, setSeverity] = useState("");
     const [pincode, setPincode] = useState("");
-    const [localities, setLocalities] = useState<string[]>([]);
+    const [fetchedLocalities, setFetchedLocalities] = useState([]);
+    const [localities, setLocalities] = useState<
+      { name: string; coords: [number, number] }[]>([]);
+    const [pincode_error, setPincodeError] = useState(null)
     const [description, setDescription] = useState("");
+
+    const options = {
+      method: "GET",
+      url: `https://india-pincode-with-latitude-and-longitude.p.rapidapi.com/api/v1/pincode/${pincode}`,
+      headers: {
+        "x-rapidapi-key": "756493b2cfmsh2115bf55dcb256bp10e017jsn0d50ad02fbe9",
+        "x-rapidapi-host":
+          "india-pincode-with-latitude-and-longitude.p.rapidapi.com",
+      },
+    };
 
     const handleSubmit = async (e) => {
       e.preventDefault();
       if (!user) {
-        toast({ title: "Please log in to submit a report", variant: "destructive" });
+        toast({
+          title: "Please log in to submit a report",
+          variant: "destructive",
+        });
         return;
       }
-      
+
       try {
         // Refresh session
-        await account.getSession('current');
-        
+        await account.getSession("current");
         const response = await databases.createDocument(
           DATABASE_ID,
           COLLECTION_ID,
@@ -82,10 +106,10 @@ export default function Home() {
         );
         console.log("Document created successfully:", response);
         toast({ title: "Report submitted successfully!" });
-        
+
         // Refresh the feed
         await fetchReports();
-        
+
         // Clear the form
         setType("");
         setSubtype("");
@@ -99,10 +123,50 @@ export default function Home() {
       } catch (error) {
         console.error("Error submitting report:", error);
         if (error instanceof AppwriteException) {
-          toast({ title: "Error submitting report", description: error.message, variant: "destructive" });
+          toast({
+            title: "Error submitting report",
+            description: error.message,
+            variant: "destructive",
+          });
         } else {
-          toast({ title: "An unexpected error occurred", variant: "destructive" });
+          toast({
+            title: "An unexpected error occurred",
+            variant: "destructive",
+          });
         }
+      }
+    };
+
+    const handleSearchPincode = async () => {
+      try {
+        const res = await axios.request(options);
+        console.log(res.data);
+        if(res.data.length==0){
+          throw "Pincode invalid!"
+        }
+        setFetchedLocalities(res.data);
+      } catch (error) {
+        console.log(error);
+        setPincodeError(error);
+      }
+    };
+
+    useEffect(() => {
+      console.log(localities);
+    }, [localities]);
+
+    useEffect(()=>{
+      if(pincode.length==6){
+        handleSearchPincode()
+      }
+      else{
+        setFetchedLocalities([])
+      }
+    },[pincode])
+
+    const handlePincodeChange = (e) => {
+      if (e.target.value.length <= 6) {
+        setPincode(e.target.value);
       }
     };
 
@@ -152,22 +216,36 @@ export default function Home() {
         </Select>
 
         <Input
-          type="text"
+          type="number"
+          max={999999}
           placeholder="Pincode"
           value={pincode}
-          onChange={(e) => setPincode(e.target.value)}
+          onChange={handlePincodeChange}
         />
+        {pincode_error && (<p className="text-red-600">{pincode_error}</p>)}
+        {/* <Button type="button" onClick={() => handleSearchPincode()}>
+          Search your area
+        </Button> */}
 
         {/* Add checkbox list for localities based on pincode */}
         {/* This is a placeholder, you'll need to implement locality fetching based on pincode */}
-        <div className="space-y-2">
-          <Checkbox id="locality1" onCheckedChange={(checked) => 
-            setLocalities(prev => checked 
-              ? [...prev, "Locality 1"] 
-              : prev.filter(l => l !== "Locality 1")
-            )
-          }/>
-          <Label htmlFor="locality1">Locality 1</Label>
+        <div className="flex flex-wrap gap-2 items-center">
+          {fetchedLocalities.map((location, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <Checkbox
+                id={`locality${index}`}
+                onCheckedChange={(checked) =>
+                  setLocalities((prev) => {
+                    const updatedLocalities = checked
+                      ? [...prev, { name: location.area, coords: [location.lat, location.lng] }]
+                      : prev.filter((l) => l.name !== location.area);
+                    return updatedLocalities;
+                  })
+                }
+              />
+              <Label htmlFor={`locality${index}`}>{location.area}</Label>
+            </div>
+          ))}
         </div>
 
         <Textarea
@@ -183,9 +261,15 @@ export default function Home() {
 
   const ReportCard = ({ report }) => (
     <div className="bg-card text-card-foreground rounded-lg shadow-sm p-4 mb-4">
-      <h3 className="font-semibold text-lg">{report.type} - {report.subtype}</h3>
-      <p className="text-sm text-muted-foreground">Severity: {report.severity}</p>
-      <p className="text-sm text-muted-foreground">Location: {report.pincode}</p>
+      <h3 className="font-semibold text-lg">
+        {report.type} - {report.subtype}
+      </h3>
+      <p className="text-sm text-muted-foreground">
+        Severity: {report.severity}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Location: {report.pincode}
+      </p>
       <p className="mt-2">{report.description}</p>
       <p className="text-xs text-muted-foreground mt-2">
         Reported on: {new Date(report.$createdAt).toLocaleString()}
@@ -205,7 +289,7 @@ export default function Home() {
             </Button>
           </DrawerTrigger>
           <DrawerContent className="max-w-md mx-auto">
-            <DrawerTitle/>
+            <DrawerTitle />
             {user ? <ReportForm /> : <Auth />}
           </DrawerContent>
         </Drawer>
