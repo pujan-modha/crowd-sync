@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { PlusIcon } from "lucide-react";
+import { LogOutIcon, PlusIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Auth } from "@/components/Auth";
 import {
@@ -37,7 +37,21 @@ import {
   useMap,
   Circle,
 } from "react-leaflet";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faComment, faCommentAlt, faFlag, faUser } from "@fortawesome/free-solid-svg-icons";
 import clsx from "clsx";
+import Image from "next/image";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -210,194 +224,291 @@ export default function Home() {
     };
 
     return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <RadioGroup value={type} onValueChange={setType}>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="hazard" id="hazard" />
-            <Label htmlFor="hazard">Hazard</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="disaster" id="disaster" />
-            <Label htmlFor="disaster">Disaster</Label>
-          </div>
-        </RadioGroup>
+      <div className="p-4">
+        <h2 className="text-xl font-semibold mb-4">Report a Disaster/Hazard</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <RadioGroup
+            value={type}
+            onValueChange={setType}
+            className="grid grid-cols-2 gap-2"
+            required
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="Hazard" id="hazard" />
+              <Label htmlFor="hazard">Hazard</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="Disaster" id="disaster" />
+              <Label htmlFor="disaster">Disaster</Label>
+            </div>
+          </RadioGroup>
+          <Select value={subtype} onValueChange={setSubtype}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              {type === "Hazard" ? (
+                <>
+                  <SelectItem value="car_accident">Car Accident</SelectItem>
+                  <SelectItem value="tree_fallen">Tree Fallen</SelectItem>
+                  <SelectItem value="fire">Fire</SelectItem>
+                  <SelectItem value="chemical_spill">Chemical Spill</SelectItem>
+                  <SelectItem value="gas_leak">Gas Leak</SelectItem>
+                  <SelectItem value="electrical_fire">Electrical Fire</SelectItem>
+                  <SelectItem value="building_collapse">Building Collapse</SelectItem>
+                  <SelectItem value="bridge_collapse">Bridge Collapse</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                  {/* Add more hazard types */}
+                </>
+              ) : (
+                <>
+                  <SelectItem value="dam_break">Dam Break</SelectItem>
+                  <SelectItem value="tsunami">Tsunami</SelectItem>
+                  <SelectItem value="volcano_eruption">Volcano Eruption</SelectItem>
+                  <SelectItem value="earthquake">Earthquake</SelectItem>
+                  <SelectItem value="flood">Flood</SelectItem>
+                  <SelectItem value="tornado">Tornado</SelectItem>
+                  <SelectItem value="wildfire">Wildfire</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                  {/* Add more disaster types */}
+                </>
+              )}
+            </SelectContent>
+          </Select>
 
-        <Select value={subtype} onValueChange={setSubtype}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select type" />
-          </SelectTrigger>
-          <SelectContent>
-            {type === "hazard" ? (
-              <>
-                <SelectItem value="chemical">Chemical</SelectItem>
-                <SelectItem value="biological">Biological</SelectItem>
-                {/* Add more hazard types */}
-              </>
-            ) : (
-              <>
-                <SelectItem value="earthquake">Earthquake</SelectItem>
-                <SelectItem value="flood">Flood</SelectItem>
-                {/* Add more disaster types */}
-              </>
-            )}
-          </SelectContent>
-        </Select>
+          <Select value={severity} onValueChange={setSeverity}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select severity" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
 
-        <Select value={severity} onValueChange={setSeverity}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select severity" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="low">Low</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Input
-          type="number"
-          max={999999}
-          placeholder="Pincode"
-          value={pincode}
-          onChange={handlePincodeChange}
-        />
-        {pincode_error && <p className="text-red-600">{pincode_error}</p>}
-        {/* <Button type="button" onClick={() => handleSearchPincode()}>
+          <Input
+            type="number"
+            max={999999}
+            placeholder="Pincode"
+            value={pincode}
+            onChange={handlePincodeChange}
+          />
+          {pincode_error && <p className="text-red-600">{pincode_error}</p>}
+          {/* <Button type="button" onClick={() => handleSearchPincode()}>
           Search your area
         </Button> */}
 
-        {/* Add checkbox list for localities based on pincode */}
-        {/* This is a placeholder, you'll need to implement locality fetching based on pincode */}
-        <div className="flex flex-wrap gap-2 items-center">
-          {fetchedLocalities.map((location, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <Checkbox
-                id={`locality${index}`}
-                onCheckedChange={(checked) =>
-                  setLocalities((prev) => {
-                    const updatedLocalities = checked
-                      ? [
-                          ...prev,
-                          {
-                            name: location.area,
-                            coords: [location.lat, location.lng],
-                          },
-                        ]
-                      : prev.filter((l) => l.name !== location.area);
-                    return updatedLocalities;
-                  })
-                }
-              />
-              <Label htmlFor={`locality${index}`}>{location.area}</Label>
-            </div>
-          ))}
-          {type === "hazard" && (
-            <Button type="button" onClick={handleGetCurrentLocation}>
-              Add current location
-            </Button>
-          )}
-        </div>
+          {/* Add checkbox list for localities based on pincode */}
+          {/* This is a placeholder, you'll need to implement locality fetching based on pincode */}
+          <div className="flex flex-wrap gap-2 items-center">
+            {fetchedLocalities.map((location, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Checkbox
+                  id={`locality${index}`}
+                  onCheckedChange={(checked) =>
+                    setLocalities((prev) => {
+                      const updatedLocalities = checked
+                        ? [
+                            ...prev,
+                            {
+                              name: location.area,
+                              coords: [location.lat, location.lng],
+                            },
+                          ]
+                        : prev.filter((l) => l.name !== location.area);
+                      return updatedLocalities;
+                    })
+                  }
+                />
+                <Label htmlFor={`locality${index}`}>{location.area}</Label>
+              </div>
+            ))}
+            {type === "Hazard" && (
+              <Button type="button" onClick={handleGetCurrentLocation}>
+                Add current location
+              </Button>
+            )}
+          </div>
 
-        <Textarea
-          placeholder="Description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
+          <Textarea
+            placeholder="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
 
-        <Button type="submit">Submit Report</Button>
-      </form>
+          <Button type="submit">Submit Report</Button>
+        </form>
+      </div>
     );
   };
 
-  const ReportCard = ({ report }) => (
-    <div className="bg-card text-card-foreground rounded-lg shadow-sm p-4 mb-4">
-      <h3 className="font-semibold text-lg">
-        {report.type} - {report.subtype}
-      </h3>
-      <p className="text-sm text-muted-foreground">
-        Severity: {report.severity}
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Location:{" "}
-        {report.localities.map((local, index) => (
-          <span key={index}>
-            {local.name}
-            {index < report.localities.length - 1 ? ", " : ""}
-          </span>
-        ))}
-      </p>
-      <p className="mt-2">{report.description}</p>
-      <p className="text-xs text-muted-foreground mt-2">
-        Reported on: {new Date(report.$createdAt).toLocaleString()}
-      </p>
-      <MapContainer
-        center={
-          report.localities.length > 0 ? report.localities[0].coords : [0, 0]
-        }
-        zoom={12}
-        maxZoom={16}
-        className="z-10 h-64"
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-        {report.localities.map((local, index) => {
-          const circleColor = () => {
-            switch (report.severity) {
-              case "low":
-                return { color: "green", fillColor: "green", fillOpacity: 0.5 };
-              case "medium":
-                return {
-                  color: "orange",
-                  fillColor: "orange",
-                  fillOpacity: 0.5,
-                };
-              case "high":
-                return { color: "red", fillColor: "red", fillOpacity: 0.5 };
-              default:
-                return { color: "gray", fillColor: "gray", fillOpacity: 0.5 }; // Default case if severity is undefined
-            }
-          };
+  const ReportCard = ({ report }) => {
+    const [dialogOpen, setDialogOpen] = useState(false);
 
-          return (
-            <Marker key={index} position={local.coords}>
-              <Popup>{local.name}</Popup>
-              <Circle
-                center={local.coords}
-                radius={30}
-                pathOptions={circleColor()} // Use pathOptions to apply styles
-              />
-            </Marker>
-          );
-        })}
-      </MapContainer>
-    </div>
-  );
+    const handleFlagConfirm = () => {
+      // Here you would implement the actual flagging logic
+      console.log("Report flagged:", report.$id);
+      setDialogOpen(false);
+    };
+
+    return (
+      <div className="bg-white border border-foreground/10 shadow rounded-lg p-4 mb-4 font-[family-name:var(--font-geist-sans)]">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center">
+            <FontAwesomeIcon
+              icon={faUser}
+              className="w-6 h-6 mr-2 rounded-full bg-primary/10 p-2 text-foreground"
+            />
+            <div className="my-auto">
+              <p>
+                {user.email
+                  ? `${user.name} ${user.email.split("@")[0]}`
+                  : "User"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(report.$createdAt).toLocaleString()}
+              </p>
+            </div>
+          </div>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="icon" variant="ghost">
+                <FontAwesomeIcon
+                  icon={faFlag}
+                  className="w-4 h-4 rounded-full p-2 text-red-400/70"
+                />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Flag this report?</DialogTitle>
+                <DialogDescription>
+                  This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <div className="mx-auto">
+                  <Button onClick={handleFlagConfirm} className="w-full">Confirm</Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-lg capitalize">
+            {report.type} - {report.subtype}
+          </h3>
+          <Badge
+            className={clsx(
+              `text-sm leading-none py-0.5 px-2`,
+              report.severity === "low"
+                ? "bg-green-500/10 border-green-500 text-green-500"
+                : report.severity === "medium"
+                ? "bg-orange-500/10 border-orange-500 text-orange-500"
+                : "bg-red-500/10 border-red-500 text-red-500"
+            )}
+          >
+            {report.severity === "low"
+              ? "Low"
+              : report.severity === "medium"
+              ? "Medium"
+              : "High"}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {report.localities.map((local, index) => (
+            <span key={index}>
+              {local.name}
+              {index < report.localities.length - 1 ? ", " : ""}
+            </span>
+          ))}
+        </p>
+        <p className="mt-2">{report.description}</p>
+
+        <MapContainer
+          center={
+            report.localities.length > 0 ? report.localities[0].coords : [0, 0]
+          }
+          zoom={12}
+          maxZoom={16}
+          className="z-10 h-48 w-full"
+        >
+          {report.localities.map((local, index) => {
+            const circleColor = () => {
+              switch (report.severity) {
+                case "low":
+                  return {
+                    color: "green",
+                    fillColor: "green",
+                    fillOpacity: 0.5,
+                  };
+                case "medium":
+                  return {
+                    color: "orange",
+                    fillColor: "orange",
+                    fillOpacity: 0.5,
+                  };
+                case "high":
+                  return { color: "red", fillColor: "red", fillOpacity: 0.5 };
+                default:
+                  return { color: "gray", fillColor: "gray", fillOpacity: 0.5 }; // Default case if severity is undefined
+              }
+            };
+
+            return (
+              <Marker key={index} position={local.coords}>
+                <Popup>{local.name}</Popup>
+                <Circle
+                  center={local.coords}
+                  radius={30}
+                  pathOptions={circleColor()} // Use pathOptions to apply styles
+                />
+              </Marker>
+            );
+          })}
+        </MapContainer>
+        <div className="flex w-full mt-2">
+          <Button>Report same issue</Button>
+          <Button size="icon" variant="ghost" className="ml-auto">
+            <FontAwesomeIcon icon={faCommentAlt} className="w-6 h-6 text-foreground/70"/>
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="bg-background h-full font-[font-family:var(--font-geist-sans)] w-md mx-auto">
+    <div className="bg-background font-[font-family:var(--font-geist-sans)] w-md mx-auto">
       <nav className="px-4 sticky flex items-center justify-between top-0 z-50 h-16 w-full bg-background border-b-2 border-primary/10">
         <div className="text-xl font-bold text-foreground">CrowdSync</div>
-        <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-          <DrawerTrigger asChild>
-            <Button size="sm" className="items-center">
-              <PlusIcon className="h-4 w-4 mr-1" />
-              <span className="leading-none">Report</span>
+        <div className="flex items-center gap-2">
+          {user && (
+            <Button size="sm" onClick={logout} variant="default" className="text-foreground">
+              <LogOutIcon className="h-4 w-4 mr-1" />
+              <span className="leading-none">Logout</span>
             </Button>
-          </DrawerTrigger>
-          <DrawerContent className="max-w-md mx-auto">
-            <DrawerTitle />
-            {user ? <ReportForm /> : <Auth />}
-          </DrawerContent>
-        </Drawer>
+          )}
+          <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <DrawerTrigger asChild>
+              <Button size="sm" className="items-center">
+                <PlusIcon className="h-4 w-4 mr-1" />
+                <span className="leading-none">Report</span>
+              </Button>
+            </DrawerTrigger>
+            <DrawerContent className="max-w-md mx-auto">
+              <DrawerTitle />
+              {user ? <ReportForm /> : <Auth />}
+            </DrawerContent>
+          </Drawer>
+        </div>
       </nav>
       <main>
-        <ScrollArea className="min-h-[calc(100vh-128px)] px-4 py-2">
+        <ScrollArea className="min-h-[calc(100vh-128px)] h-full px-4 py-2">
           <div>
             {user ? (
               <>
-                <div className="flex justify-between items-center mb-4">
+                {/* <div className="flex justify-between items-center mb-4">
                   <p className="text-lg">
                     Welcome,{" "}
                     {user.email
@@ -405,10 +516,7 @@ export default function Home() {
                       : "User"}
                     !
                   </p>
-                  <Button onClick={logout} variant="default">
-                    Logout
-                  </Button>
-                </div>
+                </div> */}
                 <h2 className="text-xl font-semibold mb-4">Recent Reports</h2>
                 {reports.map((report) => (
                   <ReportCard key={report.$id} report={report} />
