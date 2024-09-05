@@ -29,6 +29,15 @@ import { Query } from "appwrite";
 import { useEffect } from "react";
 import { AppwriteException } from "appwrite";
 import axios from "axios";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMap,
+  Circle,
+} from "react-leaflet";
+import clsx from "clsx";
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -43,9 +52,11 @@ export default function Home() {
         COLLECTION_ID,
         [Query.orderDesc("$createdAt"), Query.limit(10)]
       );
-      const parsedReports = response.documents.map(doc => ({
+      const parsedReports = response.documents.map((doc) => ({
         ...doc,
-        localities: doc.localities.map(localityString => JSON.parse(localityString))
+        localities: doc.localities.map((localityString) =>
+          JSON.parse(localityString)
+        ),
       }));
       setReports(parsedReports);
     } catch (error) {
@@ -67,8 +78,9 @@ export default function Home() {
     const [pincode, setPincode] = useState("");
     const [fetchedLocalities, setFetchedLocalities] = useState([]);
     const [localities, setLocalities] = useState<
-      { name: string; coords: [number, number] }[]>([]);
-    const [pincode_error, setPincodeError] = useState(null)
+      { name: string; coords: [number, number] }[]
+    >([]);
+    const [pincode_error, setPincodeError] = useState(null);
     const [description, setDescription] = useState("");
 
     const options = {
@@ -96,7 +108,9 @@ export default function Home() {
         await account.getSession("current");
 
         // Convert each locality object to a string
-        const localitiesAsStrings = localities.map(locality => JSON.stringify(locality));
+        const localitiesAsStrings = localities.map((locality) =>
+          JSON.stringify(locality)
+        );
 
         const response = await databases.createDocument(
           DATABASE_ID,
@@ -149,8 +163,8 @@ export default function Home() {
       try {
         const res = await axios.request(options);
         console.log(res.data);
-        if(res.data.length==0){
-          throw "Pincode invalid!"
+        if (res.data.length == 0) {
+          throw "Pincode invalid!";
         }
         setFetchedLocalities(res.data);
       } catch (error) {
@@ -163,19 +177,36 @@ export default function Home() {
       console.log(localities);
     }, [localities]);
 
-    useEffect(()=>{
-      if(pincode.length==6){
-        handleSearchPincode()
+    useEffect(() => {
+      if (pincode.length == 6) {
+        handleSearchPincode();
+      } else {
+        setFetchedLocalities([]);
       }
-      else{
-        setFetchedLocalities([])
-      }
-    },[pincode])
+    }, [pincode]);
 
     const handlePincodeChange = (e) => {
       if (e.target.value.length <= 6) {
         setPincode(e.target.value);
       }
+    };
+
+    const handleGetCurrentLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log(latitude, longitude);
+
+          // Add the current location to the localities array
+          setLocalities((prev) => [
+            ...prev,
+            { name: "Current Location", coords: [latitude, longitude] },
+          ]);
+        },
+        (error) => {
+          console.log(error);
+        }
+      );
     };
 
     return (
@@ -230,7 +261,7 @@ export default function Home() {
           value={pincode}
           onChange={handlePincodeChange}
         />
-        {pincode_error && (<p className="text-red-600">{pincode_error}</p>)}
+        {pincode_error && <p className="text-red-600">{pincode_error}</p>}
         {/* <Button type="button" onClick={() => handleSearchPincode()}>
           Search your area
         </Button> */}
@@ -245,7 +276,13 @@ export default function Home() {
                 onCheckedChange={(checked) =>
                   setLocalities((prev) => {
                     const updatedLocalities = checked
-                      ? [...prev, { name: location.area, coords: [location.lat, location.lng] }]
+                      ? [
+                          ...prev,
+                          {
+                            name: location.area,
+                            coords: [location.lat, location.lng],
+                          },
+                        ]
                       : prev.filter((l) => l.name !== location.area);
                     return updatedLocalities;
                   })
@@ -254,6 +291,11 @@ export default function Home() {
               <Label htmlFor={`locality${index}`}>{location.area}</Label>
             </div>
           ))}
+          {type === "hazard" && (
+            <Button type="button" onClick={handleGetCurrentLocation}>
+              Add current location
+            </Button>
+          )}
         </div>
 
         <Textarea
@@ -276,12 +318,60 @@ export default function Home() {
         Severity: {report.severity}
       </p>
       <p className="text-sm text-muted-foreground">
-        Location: {report.pincode}
+        Location:{" "}
+        {report.localities.map((local, index) => (
+          <span key={index}>
+            {local.name}
+            {index < report.localities.length - 1 ? ", " : ""}
+          </span>
+        ))}
       </p>
       <p className="mt-2">{report.description}</p>
       <p className="text-xs text-muted-foreground mt-2">
         Reported on: {new Date(report.$createdAt).toLocaleString()}
       </p>
+      <MapContainer
+        center={
+          report.localities.length > 0 ? report.localities[0].coords : [0, 0]
+        }
+        zoom={12}
+        maxZoom={16}
+        className="z-10 h-64"
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+        {report.localities.map((local, index) => {
+          const circleColor = () => {
+            switch (report.severity) {
+              case "low":
+                return { color: "green", fillColor: "green", fillOpacity: 0.5 };
+              case "medium":
+                return {
+                  color: "orange",
+                  fillColor: "orange",
+                  fillOpacity: 0.5,
+                };
+              case "high":
+                return { color: "red", fillColor: "red", fillOpacity: 0.5 };
+              default:
+                return { color: "gray", fillColor: "gray", fillOpacity: 0.5 }; // Default case if severity is undefined
+            }
+          };
+
+          return (
+            <Marker key={index} position={local.coords}>
+              <Popup>{local.name}</Popup>
+              <Circle
+                center={local.coords}
+                radius={30}
+                pathOptions={circleColor()} // Use pathOptions to apply styles
+              />
+            </Marker>
+          );
+        })}
+      </MapContainer>
     </div>
   );
 
