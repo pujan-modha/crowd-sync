@@ -10,6 +10,7 @@ interface AuthContextType {
   sendMagicLink: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,13 +59,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const refreshSession = async () => {
+    try {
+      const session = await account.getSession('current');
+      setUser(session);
+      return session;
+    } catch (error) {
+      console.error("Error refreshing session:", error);
+      setUser(null);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     checkSession();
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, sendMagicLink, logout, checkSession }}
+      value={{ user, loading, sendMagicLink, logout, checkSession, refreshSession }}
     >
       {children}
     </AuthContext.Provider>

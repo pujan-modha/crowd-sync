@@ -44,16 +44,16 @@ export function Auth() {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full border-none">
       <CardHeader>
         <CardTitle>Login / Register</CardTitle>
         <CardDescription>
           Enter your email to receive a magic link
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+      <CardContent className="w-full">
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-2 mb-4">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -65,7 +65,7 @@ export function Auth() {
             />
           </div>
           <Button className="w-full" type="submit" disabled={loading}>
-            {loading ? "Sending..." : "Send Magic Link"}
+            {loading ? "Loading..." : "Continue"}
           </Button>
         </form>
       </CardContent>
