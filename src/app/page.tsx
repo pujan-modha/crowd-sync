@@ -5,12 +5,6 @@ import { LogOutIcon, PlusIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Auth } from "@/components/Auth";
 import dynamic from "next/dynamic";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
 import { useState } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -62,7 +56,7 @@ export default function Home() {
   const { user, logout } = useAuth();
   const [reports, setReports] = useState([]);
   const { toast } = useToast();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const fetchReports = async () => {
     try {
@@ -159,8 +153,8 @@ export default function Home() {
         setLocalities([]);
         setDescription("");
 
-        // Close the drawer
-        setDrawerOpen(false);
+        // Close the dialog
+        setDialogOpen(false);
       } catch (error) {
         console.error("Error submitting report:", error);
         if (error instanceof AppwriteException) {
@@ -231,8 +225,7 @@ export default function Home() {
     };
 
     return (
-      <div className="p-4">
-        <h2 className="text-xl font-semibold mb-4">Report a Disaster/Hazard</h2>
+      <div className="">
         <form onSubmit={handleSubmit} className="space-y-4">
           <RadioGroup
             value={type}
@@ -455,18 +448,18 @@ export default function Home() {
               <span className="leading-none">Logout</span>
             </Button>
           )}
-          <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-            <DrawerTrigger asChild>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
               <Button size="sm" className="items-center">
                 <PlusIcon className="h-4 w-4 mr-1" />
                 <span className="leading-none">Report</span>
               </Button>
-            </DrawerTrigger>
-            <DrawerContent className="max-w-md mx-auto">
-              <DrawerTitle />
+            </DialogTrigger>
+            <DialogContent className="max-w-md mx-auto">
+              <DialogTitle>Report a Disaster/Hazard</DialogTitle>
               {user ? <ReportForm /> : <Auth />}
-            </DrawerContent>
-          </Drawer>
+            </DialogContent>
+          </Dialog>
         </div>
       </nav>
       <main>
