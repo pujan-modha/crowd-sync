@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LogOutIcon, PlusIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Auth } from "@/components/Auth";
+import dynamic from "next/dynamic";
 import {
   Drawer,
   DrawerContent,
@@ -52,6 +53,10 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+
+const ClientSideMap = dynamic(() => import('@/components/ClientSideMap'), {
+  ssr: false,
+});
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -206,21 +211,23 @@ export default function Home() {
     };
 
     const handleGetCurrentLocation = () => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          console.log(latitude, longitude);
+      if (typeof window !== 'undefined') {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log(latitude, longitude);
 
-          // Add the current location to the localities array
-          setLocalities((prev) => [
-            ...prev,
-            { name: "Current Location", coords: [latitude, longitude] },
-          ]);
-        },
-        (error) => {
-          console.log(error);
-        }
-      );
+            // Add the current location to the localities array
+            setLocalities((prev) => [
+              ...prev,
+              { name: "Current Location", coords: [latitude, longitude] },
+            ]);
+          },
+          (error) => {
+            console.log(error);
+          }
+        );
+      }
     };
 
     return (
@@ -426,50 +433,9 @@ export default function Home() {
         </p>
         <p className="mt-2">{report.description}</p>
 
-        <MapContainer
-          center={
-            report.localities.length > 0 ? report.localities[0].coords : [0, 0]
-          }
-          zoom={12}
-          maxZoom={16}
-          className="z-10 h-48 w-full"
-        >
-          {report.localities.map((local, index) => {
-            const circleColor = () => {
-              switch (report.severity) {
-                case "low":
-                  return {
-                    color: "green",
-                    fillColor: "green",
-                    fillOpacity: 0.5,
-                  };
-                case "medium":
-                  return {
-                    color: "orange",
-                    fillColor: "orange",
-                    fillOpacity: 0.5,
-                  };
-                case "high":
-                  return { color: "red", fillColor: "red", fillOpacity: 0.5 };
-                default:
-                  return { color: "gray", fillColor: "gray", fillOpacity: 0.5 }; // Default case if severity is undefined
-              }
-            };
-
-            return (
-              <Marker key={index} position={local.coords}>
-                <Popup>{local.name}</Popup>
-                <Circle
-                  center={local.coords}
-                  radius={30}
-                  pathOptions={circleColor()} // Use pathOptions to apply styles
-                />
-              </Marker>
-            );
-          })}
-        </MapContainer>
+        <ClientSideMap report={report} />
         <div className="flex w-full mt-2">
-          <Button>Report same issue</Button>
+          <Button size="sm">Report same issue</Button>
           <Button size="icon" variant="ghost" className="ml-auto">
             <FontAwesomeIcon icon={faCommentAlt} className="w-6 h-6 text-foreground/70"/>
           </Button>
