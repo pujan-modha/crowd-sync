@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: 220 16% 22%;
+    --popover: 210 31% 95%;
+    --background: 218 27% 94%;
+    --foreground: 213 32% 52%;
+    --destructive: 354 42% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-primary;
+  }
+  body {
+    @apply bg-background text-primary;
+  }
+}
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  @apply bg-primary;
+}
+
+::selection {
+  @apply bg-primary;
+  @apply text-background;
+}
