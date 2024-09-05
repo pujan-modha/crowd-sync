@@ -43,7 +43,11 @@ export default function Home() {
         COLLECTION_ID,
         [Query.orderDesc("$createdAt"), Query.limit(10)]
       );
-      setReports(response.documents);
+      const parsedReports = response.documents.map(doc => ({
+        ...doc,
+        localities: doc.localities.map(localityString => JSON.parse(localityString))
+      }));
+      setReports(parsedReports);
     } catch (error) {
       console.error("Error fetching reports:", error);
       toast({ title: "Error fetching reports", variant: "destructive" });
@@ -77,7 +81,7 @@ export default function Home() {
       },
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!user) {
         toast({
@@ -90,6 +94,10 @@ export default function Home() {
       try {
         // Refresh session
         await account.getSession("current");
+
+        // Convert each locality object to a string
+        const localitiesAsStrings = localities.map(locality => JSON.stringify(locality));
+
         const response = await databases.createDocument(
           DATABASE_ID,
           COLLECTION_ID,
@@ -99,7 +107,7 @@ export default function Home() {
             subtype,
             severity,
             pincode,
-            localities,
+            localities: localitiesAsStrings, // Send array of strings
             description,
             user_id: user.$id,
           }
