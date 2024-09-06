@@ -245,7 +245,7 @@ export default function Home() {
     );
   };
 
-  const ReportForm = () => {
+  const ReportForm = ({ setDialogOpen, fetchReports }) => {
     const [type, setType] = useState("");
     const [subtype, setSubtype] = useState("");
     const [severity, setSeverity] = useState("");
@@ -343,24 +343,23 @@ export default function Home() {
         );
         console.log("Document created successfully:", response);
         toast({ 
-          title: "Report submitted successfully!",
-          onDismiss: () => {
-            // Clear the form
-            setType("");
-            setSubtype("");
-            setSeverity("");
-            setPincode("");
-            setLocalities([]);
-            setDescription("");
-            setFormErrors({});
-
-            // Close the dialog
-            setDialogOpen(false);
-
-            // Refresh the feed
-            fetchReports();
-          }
+          title: "Report submitted successfully!"
         });
+        
+        // Clear the form
+        setType("");
+        setSubtype("");
+        setSeverity("");
+        setPincode("");
+        setLocalities([]);
+        setDescription("");
+        setFormErrors({});
+
+        // Close the dialog
+        setDialogOpen(false);
+
+        // Refresh the feed
+        fetchReports();
       } catch (error) {
         console.error("Error submitting report:", error);
         if (error instanceof AppwriteException) {
@@ -749,7 +748,14 @@ export default function Home() {
             </DialogTrigger>
             <DialogContent className="max-w-md mx-auto">
               <DialogTitle>Report a Disaster/Hazard</DialogTitle>
-              {user ? <ReportForm /> : <Auth />}
+              {user ? (
+                <ReportForm 
+                  setDialogOpen={setDialogOpen} 
+                  fetchReports={fetchReports}
+                />
+              ) : (
+                <Auth />
+              )}
             </DialogContent>
           </Dialog>
         </div>
