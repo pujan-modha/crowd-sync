@@ -1,10 +1,11 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { LogOutIcon, PlusIcon } from "lucide-react";
+import { LogIn, LogOutIcon, PlusIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Auth } from "@/components/Auth";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useState } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -723,7 +724,7 @@ export default function Home() {
                     <div className="mb-2">
                       <p className="items-center">
                         {comment.user_id
-                          ? `${user.name} ${user.email.split("@")[0]}`
+                          ? `${user?.name} ${user?.email.split("@")[0]}`
                           : "User"}
 
                         <span className="text-xs text-primary/70 ml-1">
@@ -886,13 +887,20 @@ export default function Home() {
           )}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="items-center">
-                <PlusIcon className="h-4 w-4 mr-1" />
-                <span className="leading-none">Report</span>
-              </Button>
+              {user ? (
+                <Button size="sm" className="items-center">
+                  <PlusIcon className="h-4 w-4 mr-1" />
+                  <span className="leading-none">Report</span>
+                </Button>
+              ) : (
+                <Button size="sm" className="items-center">
+                  <LogIn className="h-4 w-4 mr-1" />
+                  <span className="leading-none">Login</span>
+                </Button>
+              )}
             </DialogTrigger>
             <DialogContent className="max-w-md mx-auto">
-              <DialogTitle>Report a Disaster/Hazard</DialogTitle>
+              {/* <DialogTitle/> */}
               {user ? (
                 <ReportForm
                   setDialogOpen={setDialogOpen}
@@ -927,9 +935,53 @@ export default function Home() {
               </>
             )
           ) : (
-            <p className="text-lg text-center">
-              Please log in to view and submit reports.
-            </p>
+            <div className="flex flex-col justify-center items-center h-full">
+              <div className="flex h-screen">
+                <div className="flex flex-col">
+                  <div className="flex mx-auto mt-auto">
+                    <p className="text-xl font-semibold text-foreground">
+                      Please login to view reports
+                    </p>
+                  </div>
+                  <div className="flex mx-auto">
+                    <Image
+                      src="/new-style.svg"
+                      alt="CrowdSync"
+                      width={300}
+                      height={300}
+                    />
+                  </div>
+                  <div className="flex mx-auto mb-auto">
+                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                      <DialogTrigger asChild>
+                        {user ? (
+                          <Button size="sm" className="items-center">
+                            <PlusIcon className="h-4 w-4 mr-1" />
+                            <span className="leading-none">Report</span>
+                          </Button>
+                        ) : (
+                          <Button size="sm" className="items-center">
+                            <LogIn className="h-4 w-4 mr-1" />
+                            <span className="leading-none">Login</span>
+                          </Button>
+                        )}
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md mx-auto">
+                        {/* <DialogTitle/> */}
+                        {user ? (
+                          <ReportForm
+                            setDialogOpen={setDialogOpen}
+                            fetchReports={fetchReports}
+                          />
+                        ) : (
+                          <Auth />
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </ScrollArea>
       </main>

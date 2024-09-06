@@ -25,7 +25,7 @@ export function Auth() {
     try {
       await sendMagicLink(email);
       toast({
-        title: "Magic Link Sent",
+        title: "Login Link Sent",
         description: "Please check your email for the login link.",
       });
     } catch (error) {
@@ -35,7 +35,7 @@ export function Auth() {
         description:
           error instanceof Error
             ? error.message
-            : "Failed to send magic link. Please try again.",
+            : "Failed to send login link. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -45,16 +45,15 @@ export function Auth() {
 
   return (
     <Card className="w-full border-none">
-      <CardHeader>
+      <CardHeader className="p-0 mb-1">
         <CardTitle>Login / Register</CardTitle>
         <CardDescription>
-          Enter your email to receive a magic link
+          Enter your email to receive a login link
         </CardDescription>
       </CardHeader>
-      <CardContent className="w-full">
+      <CardContent className="w-full p-0 m-0">
         <form onSubmit={handleSubmit}>
           <div className="space-y-2 mb-4">
-            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
