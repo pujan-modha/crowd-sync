@@ -43,7 +43,7 @@ export default function RootLayout({
         ></script>
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased md:max-w-md mx-auto bg-primary h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased md:max-w-md mx-auto bg-primary h-screen tabular-nums`}
       >
         <AuthProvider>
           {children}

@@ -20,11 +20,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { databases, account, DATABASE_ID, COLLECTION_ID } from "@/lib/appwrite";
-import { AppwriteException, Query, ID } from 'appwrite';
+import { AppwriteException, Query, ID } from "appwrite";
 import { useEffect } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCommentAlt, faFlag, faUser } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCommentAlt,
+  faFlag,
+  faUser,
+} from "@fortawesome/free-solid-svg-icons";
 import clsx from "clsx";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,14 +40,22 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerFooter,
+} from "@/components/ui/drawer";
 
-const ClientSideMap = dynamic(() => import('@/components/ClientSideMap'), {
+const ClientSideMap = dynamic(() => import("@/components/ClientSideMap"), {
   ssr: false,
 });
 
-const USER_PROFILES_COLLECTION_ID = '66da4caa000ad6801495';
+const USER_PROFILES_COLLECTION_ID = "66da4caa000ad6801495";
 const POSTS_COLLECTION_ID = "66d9d751000060119f8b";
 const USER_REPORTS_COLLECTION_ID = "user_reports";
+const COMMENTS_COLLECTION_ID = "comments";
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -52,6 +64,10 @@ export default function Home() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [userPincode, setUserPincode] = useState<string | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [commentDrawerOpen, setCommentDrawerOpen] = useState(false);
+  const [currentPostId, setCurrentPostId] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
 
   const fetchReports = async () => {
     if (!userPincode) {
@@ -66,23 +82,25 @@ export default function Home() {
         [
           Query.equal("pincode", userPincode),
           Query.orderDesc("$createdAt"),
-          Query.limit(10)
+          Query.limit(10),
         ]
       );
-      const parsedPosts = await Promise.all(response.documents.map(async (doc) => {
-        const userReports = await databases.listDocuments(
-          DATABASE_ID,
-          USER_REPORTS_COLLECTION_ID,
-          [Query.equal("post_id", doc.$id)]
-        );
-        return {
-          ...doc,
-          localities: doc.localities.map((localityString) =>
-            JSON.parse(localityString)
-          ),
-          report_count: userReports.total,
-        };
-      }));
+      const parsedPosts = await Promise.all(
+        response.documents.map(async (doc) => {
+          const userReports = await databases.listDocuments(
+            DATABASE_ID,
+            USER_REPORTS_COLLECTION_ID,
+            [Query.equal("post_id", doc.$id)]
+          );
+          return {
+            ...doc,
+            localities: doc.localities.map((localityString) =>
+              JSON.parse(localityString)
+            ),
+            report_count: userReports.total,
+          };
+        })
+      );
       setReports(parsedPosts);
     } catch (error) {
       console.error("Error fetching posts:", error);
@@ -101,20 +119,20 @@ export default function Home() {
 
     setIsLoadingProfile(true);
     try {
-      console.log('Checking user profile for user ID:', user.$id);
-      console.log('Using DATABASE_ID:', DATABASE_ID);
-      console.log('Using COLLECTION_ID:', USER_PROFILES_COLLECTION_ID);
+      console.log("Checking user profile for user ID:", user.$id);
+      console.log("Using DATABASE_ID:", DATABASE_ID);
+      console.log("Using COLLECTION_ID:", USER_PROFILES_COLLECTION_ID);
 
       const response = await databases.listDocuments(
         DATABASE_ID,
         USER_PROFILES_COLLECTION_ID,
-        [Query.equal('user_id', user.$id)]
+        [Query.equal("user_id", user.$id)]
       );
 
-      console.log('Response from listDocuments:', response);
+      console.log("Response from listDocuments:", response);
 
       if (response.documents.length === 0) {
-        console.log('No existing profile found, creating new one');
+        console.log("No existing profile found, creating new one");
         // User profile doesn't exist, create one
         try {
           const newProfile = await databases.createDocument(
@@ -123,55 +141,55 @@ export default function Home() {
             ID.unique(),
             {
               user_id: user.$id,
-              pincode: '', // Set an empty string as the initial value
+              pincode: "", // Set an empty string as the initial value
             }
           );
-          console.log('New profile created:', newProfile);
-          setUserPincode(''); // This will ensure the form stays visible
+          console.log("New profile created:", newProfile);
+          setUserPincode(""); // This will ensure the form stays visible
           toast({
-            title: 'Profile created',
-            description: 'Please set your pincode.',
-            variant: 'default',
+            title: "Profile created",
+            description: "Please set your pincode.",
+            variant: "default",
           });
         } catch (createError) {
-          console.error('Error creating user profile:', createError);
+          console.error("Error creating user profile:", createError);
           if (createError instanceof AppwriteException) {
-            console.error('Appwrite error code:', createError.code);
-            console.error('Appwrite error message:', createError.message);
-            console.error('Appwrite error type:', createError.type);
+            console.error("Appwrite error code:", createError.code);
+            console.error("Appwrite error message:", createError.message);
+            console.error("Appwrite error type:", createError.type);
           }
           toast({
-            title: 'Error creating user profile',
-            description: 'Please try again later.',
-            variant: 'destructive',
+            title: "Error creating user profile",
+            description: "Please try again later.",
+            variant: "destructive",
           });
         }
       } else {
-        console.log('Existing profile found:', response.documents[0]);
+        console.log("Existing profile found:", response.documents[0]);
         // User profile exists
         const existingProfile = response.documents[0];
-        if (existingProfile.pincode === '') {
-          setUserPincode(''); // This will show the form if pincode is empty
+        if (existingProfile.pincode === "") {
+          setUserPincode(""); // This will show the form if pincode is empty
           toast({
-            title: 'Pincode not set',
-            description: 'Please set your pincode.',
-            variant: 'default',
+            title: "Pincode not set",
+            description: "Please set your pincode.",
+            variant: "default",
           });
         } else {
           setUserPincode(existingProfile.pincode);
         }
       }
     } catch (error) {
-      console.error('Error checking user profile:', error);
+      console.error("Error checking user profile:", error);
       if (error instanceof AppwriteException) {
-        console.error('Appwrite error code:', error.code);
-        console.error('Appwrite error message:', error.message);
-        console.error('Appwrite error type:', error.type);
+        console.error("Appwrite error code:", error.code);
+        console.error("Appwrite error message:", error.message);
+        console.error("Appwrite error type:", error.type);
       }
       toast({
-        title: 'Error checking user profile',
-        description: 'Please check your database and collection IDs.',
-        variant: 'destructive',
+        title: "Error checking user profile",
+        description: "Please check your database and collection IDs.",
+        variant: "destructive",
       });
     } finally {
       setIsLoadingProfile(false);
@@ -189,7 +207,7 @@ export default function Home() {
         const response = await databases.listDocuments(
           DATABASE_ID,
           USER_PROFILES_COLLECTION_ID,
-          [Query.equal('user_id', user.$id)]
+          [Query.equal("user_id", user.$id)]
         );
 
         if (response.documents.length > 0) {
@@ -230,7 +248,9 @@ export default function Home() {
     return (
       <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
         <h2 className="text-2xl font-bold mb-4">Set Your Pincode</h2>
-        <p className="mb-4 text-gray-600">Please set your pincode to continue using the app.</p>
+        <p className="mb-4 text-gray-600">
+          Please set your pincode to continue using the app.
+        </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             type="text"
@@ -239,7 +259,9 @@ export default function Home() {
             onChange={(e) => setPincode(e.target.value)}
             required
           />
-          <Button type="submit" className="w-full">Save Pincode</Button>
+          <Button type="submit" className="w-full">
+            Save Pincode
+          </Button>
         </form>
       </div>
     );
@@ -256,9 +278,11 @@ export default function Home() {
     >([]);
     const [pincode_error, setPincodeError] = useState(null);
     const [description, setDescription] = useState("");
-    const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+    const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
-    const handlePincodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePincodeChange = async (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
       const newPincode = e.target.value;
       if (newPincode.length <= 6) {
         setPincode(newPincode);
@@ -268,8 +292,10 @@ export default function Home() {
               method: "GET",
               url: `https://india-pincode-with-latitude-and-longitude.p.rapidapi.com/api/v1/pincode/${newPincode}`,
               headers: {
-                "x-rapidapi-key": "756493b2cfmsh2115bf55dcb256bp10e017jsn0d50ad02fbe9",
-                "x-rapidapi-host": "india-pincode-with-latitude-and-longitude.p.rapidapi.com",
+                "x-rapidapi-key":
+                  "756493b2cfmsh2115bf55dcb256bp10e017jsn0d50ad02fbe9",
+                "x-rapidapi-host":
+                  "india-pincode-with-latitude-and-longitude.p.rapidapi.com",
               },
             });
             if (res.data.length === 0) {
@@ -292,13 +318,14 @@ export default function Home() {
     };
 
     const validateForm = () => {
-      const errors: {[key: string]: string} = {};
+      const errors: { [key: string]: string } = {};
       if (!type) errors.type = "Type is required";
       if (!subtype) errors.subtype = "Subtype is required";
       if (!severity) errors.severity = "Severity is required";
       if (!pincode) errors.pincode = "Pincode is required";
-      if (localities.length === 0) errors.localities = "At least one locality is required";
-      
+      if (localities.length === 0)
+        errors.localities = "At least one locality is required";
+
       setFormErrors(errors);
       return Object.keys(errors).length === 0;
     };
@@ -342,10 +369,10 @@ export default function Home() {
           }
         );
         console.log("Document created successfully:", response);
-        toast({ 
-          title: "Report submitted successfully!"
+        toast({
+          title: "Report submitted successfully!",
         });
-        
+
         // Clear the form
         setType("");
         setSubtype("");
@@ -378,13 +405,13 @@ export default function Home() {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-      if (e.key === 'Enter') {
+      if (e.key === "Enter") {
         e.preventDefault();
       }
     };
 
     const handleGetCurrentLocation = () => {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const { latitude, longitude } = position.coords;
@@ -569,10 +596,7 @@ export default function Home() {
       const existingReports = await databases.listDocuments(
         DATABASE_ID,
         USER_REPORTS_COLLECTION_ID,
-        [
-          Query.equal('user_id', user.$id),
-          Query.equal('post_id', postId)
-        ]
+        [Query.equal("user_id", user.$id), Query.equal("post_id", postId)]
       );
 
       if (existingReports.total > 0) {
@@ -595,8 +619,8 @@ export default function Home() {
       );
 
       // Update the local state
-      setReports(prevReports =>
-        prevReports.map(report =>
+      setReports((prevReports) =>
+        prevReports.map((report) =>
           report.$id === postId
             ? { ...report, report_count: (report.report_count || 0) + 1 }
             : report
@@ -617,6 +641,82 @@ export default function Home() {
     }
   };
 
+  const fetchComments = async (postId) => {
+    try {
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        COMMENTS_COLLECTION_ID,
+        [
+          Query.equal("post_id", postId),
+          Query.orderDesc("$createdAt"),
+          Query.limit(50),
+        ]
+      );
+      setComments(response.documents);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      toast({ title: "Error fetching comments", variant: "destructive" });
+    }
+  };
+
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    if (!user || !currentPostId || !newComment.trim()) return;
+
+    try {
+      await databases.createDocument(
+        DATABASE_ID,
+        COMMENTS_COLLECTION_ID,
+        ID.unique(),
+        {
+          post_id: currentPostId,
+          user_id: user.$id,
+          content: newComment.trim(),
+          created_at: new Date().toISOString(),
+        }
+      );
+      setNewComment("");
+      fetchComments(currentPostId);
+      toast({ title: "Comment added successfully" });
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      toast({ title: "Error adding comment", variant: "destructive" });
+    }
+  };
+
+  const CommentDrawer = () => (
+    <Drawer open={commentDrawerOpen} onOpenChange={setCommentDrawerOpen}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Comments</DrawerTitle>
+        </DrawerHeader>
+        <div className="p-4">
+          <form onSubmit={handleCommentSubmit} className="mb-4">
+            <Input
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment..."
+            />
+            <Button type="submit" className="mt-2">
+              Post Comment
+            </Button>
+          </form>
+          <div className="space-y-4">
+            {comments.map((comment) => (
+              <div key={comment.$id} className="border-b pb-2">
+                <p className="font-semibold">{comment.user_id}</p>
+                <p>{comment.content}</p>
+                <p className="text-xs text-gray-500">
+                  {new Date(comment.created_at).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </DrawerContent>
+    </Drawer>
+  );
+
   const ReportCard = ({ report }) => {
     const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -624,6 +724,12 @@ export default function Home() {
       // Here you would implement the actual flagging logic
       console.log("Report flagged:", report.$id);
       setDialogOpen(false);
+    };
+
+    const handleCommentClick = () => {
+      setCurrentPostId(report.$id);
+      fetchComments(report.$id);
+      setCommentDrawerOpen(true);
     };
 
     return (
@@ -663,7 +769,11 @@ export default function Home() {
               </DialogHeader>
               <DialogFooter>
                 <div className="mx-auto">
-                  <Button size="sm" onClick={handleFlagConfirm} className="w-full">
+                  <Button
+                    size="sm"
+                    onClick={handleFlagConfirm}
+                    className="w-full"
+                  >
                     Confirm
                   </Button>
                 </div>
@@ -708,7 +818,12 @@ export default function Home() {
           <Button size="sm" onClick={() => reportSameIssue(report.$id)}>
             Report same issue ({report.report_count || 0})
           </Button>
-          <Button size="icon" variant="link" className="ml-auto">
+          <Button
+            size="icon"
+            variant="link"
+            className="ml-auto"
+            onClick={handleCommentClick}
+          >
             <FontAwesomeIcon
               icon={faCommentAlt}
               className="w-6 h-6 text-foreground/70"
@@ -734,7 +849,12 @@ export default function Home() {
         <div className="text-xl font-bold text-foreground">CrowdSync</div>
         <div className="flex items-center gap-2">
           {user && (
-            <Button size="sm" onClick={logout} variant="default" className="text-foreground">
+            <Button
+              size="sm"
+              onClick={logout}
+              variant="default"
+              className="text-foreground"
+            >
               <LogOutIcon className="h-4 w-4 mr-1" />
               <span className="leading-none">Logout</span>
             </Button>
@@ -749,8 +869,8 @@ export default function Home() {
             <DialogContent className="max-w-md mx-auto">
               <DialogTitle>Report a Disaster/Hazard</DialogTitle>
               {user ? (
-                <ReportForm 
-                  setDialogOpen={setDialogOpen} 
+                <ReportForm
+                  setDialogOpen={setDialogOpen}
                   fetchReports={fetchReports}
                 />
               ) : (
@@ -769,7 +889,9 @@ export default function Home() {
               <UserProfileForm />
             ) : (
               <>
-                <h2 className="text-xl font-semibold mb-4">Recent Reports for PIN {userPincode}</h2>
+                <h2 className="text-xl font-semibold mb-4">
+                  Recent Reports for PIN {userPincode}
+                </h2>
                 {reports.length > 0 ? (
                   reports.map((report) => (
                     <ReportCard key={report.$id} report={report} />
@@ -793,6 +915,7 @@ export default function Home() {
           </p>
         </div>
       </footer>
+      <CommentDrawer />
     </div>
   );
 }
