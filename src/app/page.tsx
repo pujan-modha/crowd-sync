@@ -703,12 +703,25 @@ export default function Home() {
           </form>
           <div className="space-y-4">
             {comments.map((comment) => (
-              <div key={comment.$id} className="border-b pb-2">
-                <p className="font-semibold">{comment.user_id}</p>
-                <p>{comment.content}</p>
-                <p className="text-xs text-gray-500">
-                  {new Date(comment.created_at).toLocaleString()}
-                </p>
+              <div key={comment.$id} className="pb-2">
+                <div className="flex items-center">
+                  <FontAwesomeIcon
+                    icon={faUser}
+                    className="w-5 h-5 mr-2 rounded-full bg-primary/10 p-2 text-foreground"
+                  />
+                  <div className="mb-2">
+                    <p className="items-center">
+                      {comment.user_id
+                        ? `${user.name} ${user.email.split("@")[0]}`
+                        : "User"}
+
+                      <span className="text-xs text-primary/70 ml-1">
+                        ({new Date(comment.$createdAt).toLocaleString()})
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <p className="border-b pb-1 ml-11">{comment.content}</p>
               </div>
             ))}
           </div>
