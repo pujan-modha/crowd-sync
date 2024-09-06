@@ -769,7 +769,7 @@ export default function Home() {
               <UserProfileForm />
             ) : (
               <>
-                <h2 className="text-xl font-semibold mb-4">Recent Reports for {userPincode}</h2>
+                <h2 className="text-xl font-semibold mb-4">Recent Reports for PIN {userPincode}</h2>
                 {reports.length > 0 ? (
                   reports.map((report) => (
                     <ReportCard key={report.$id} report={report} />
