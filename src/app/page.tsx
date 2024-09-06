@@ -23,18 +23,9 @@ import { databases, account, DATABASE_ID, COLLECTION_ID } from "@/lib/appwrite";
 import { AppwriteException, Query, ID } from 'appwrite';
 import { useEffect } from "react";
 import axios from "axios";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  useMap,
-  Circle,
-} from "react-leaflet";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faComment, faCommentAlt, faFlag, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faCommentAlt, faFlag, faUser } from "@fortawesome/free-solid-svg-icons";
 import clsx from "clsx";
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -44,7 +35,6 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 
 const ClientSideMap = dynamic(() => import('@/components/ClientSideMap'), {
@@ -52,6 +42,8 @@ const ClientSideMap = dynamic(() => import('@/components/ClientSideMap'), {
 });
 
 const USER_PROFILES_COLLECTION_ID = '66da4caa000ad6801495';
+const POSTS_COLLECTION_ID = "66d9d751000060119f8b";
+const USER_REPORTS_COLLECTION_ID = "user_reports";
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -63,30 +55,38 @@ export default function Home() {
 
   const fetchReports = async () => {
     if (!userPincode) {
-      console.log("User pincode not set, cannot fetch reports");
+      console.log("User pincode not set, cannot fetch posts");
       return;
     }
 
     try {
       const response = await databases.listDocuments(
         DATABASE_ID,
-        COLLECTION_ID,
+        POSTS_COLLECTION_ID,
         [
           Query.equal("pincode", userPincode),
           Query.orderDesc("$createdAt"),
           Query.limit(10)
         ]
       );
-      const parsedReports = response.documents.map((doc) => ({
-        ...doc,
-        localities: doc.localities.map((localityString) =>
-          JSON.parse(localityString)
-        ),
+      const parsedPosts = await Promise.all(response.documents.map(async (doc) => {
+        const userReports = await databases.listDocuments(
+          DATABASE_ID,
+          USER_REPORTS_COLLECTION_ID,
+          [Query.equal("post_id", doc.$id)]
+        );
+        return {
+          ...doc,
+          localities: doc.localities.map((localityString) =>
+            JSON.parse(localityString)
+          ),
+          report_count: userReports.total,
+        };
       }));
-      setReports(parsedReports);
+      setReports(parsedPosts);
     } catch (error) {
-      console.error("Error fetching reports:", error);
-      toast({ title: "Error fetching reports", variant: "destructive" });
+      console.error("Error fetching posts:", error);
+      toast({ title: "Error fetching posts", variant: "destructive" });
     }
   };
 
@@ -504,6 +504,68 @@ export default function Home() {
     );
   };
 
+  const reportSameIssue = async (postId: string) => {
+    if (!user) {
+      toast({
+        title: "Please log in to report an issue",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Check if the user has already reported this issue
+      const existingReports = await databases.listDocuments(
+        DATABASE_ID,
+        USER_REPORTS_COLLECTION_ID,
+        [
+          Query.equal('user_id', user.$id),
+          Query.equal('post_id', postId)
+        ]
+      );
+
+      if (existingReports.total > 0) {
+        toast({
+          title: "You've already reported this issue",
+          variant: "default",
+        });
+        return;
+      }
+
+      // Create a new user report
+      await databases.createDocument(
+        DATABASE_ID,
+        USER_REPORTS_COLLECTION_ID,
+        ID.unique(),
+        {
+          user_id: user.$id,
+          post_id: postId,
+        }
+      );
+
+      // Update the local state
+      setReports(prevReports =>
+        prevReports.map(report =>
+          report.$id === postId
+            ? { ...report, report_count: (report.report_count || 0) + 1 }
+            : report
+        )
+      );
+
+      toast({
+        title: "Issue reported successfully",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error reporting issue:", error);
+      toast({
+        title: "Error reporting issue",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const ReportCard = ({ report }) => {
     const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -514,7 +576,7 @@ export default function Home() {
     };
 
     return (
-      <div className="bg-white border border-foreground/10 shadow rounded-lg p-4 mb-4 font-[family-name:var(--font-geist-sans)]">
+      <div className="bg-white border border-foreground/10 shadow rounded-lg px-4 pt-4 pb-2 mb-4 font-[family-name:var(--font-geist-sans)]">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center">
             <FontAwesomeIcon
@@ -550,7 +612,7 @@ export default function Home() {
               </DialogHeader>
               <DialogFooter>
                 <div className="mx-auto">
-                  <Button onClick={handleFlagConfirm} className="w-full">
+                  <Button size="sm" onClick={handleFlagConfirm} className="w-full">
                     Confirm
                   </Button>
                 </div>
@@ -592,7 +654,9 @@ export default function Home() {
         <p className="mt-2">{report.description}</p>
 
         <div className="flex w-full mt-2">
-          <Button size="sm">Report same issue</Button>
+          <Button size="sm" onClick={() => reportSameIssue(report.$id)}>
+            Report same issue ({report.report_count || 0})
+          </Button>
           <Button size="icon" variant="link" className="ml-auto">
             <FontAwesomeIcon
               icon={faCommentAlt}
