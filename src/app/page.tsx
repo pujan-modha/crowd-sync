@@ -20,9 +20,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { databases, account, DATABASE_ID, COLLECTION_ID } from "@/lib/appwrite";
-import { Query } from "appwrite";
+import { AppwriteException, Query, ID } from 'appwrite';
 import { useEffect } from "react";
-import { AppwriteException } from "appwrite";
 import axios from "axios";
 import {
   MapContainer,
@@ -52,18 +51,31 @@ const ClientSideMap = dynamic(() => import('@/components/ClientSideMap'), {
   ssr: false,
 });
 
+const USER_PROFILES_COLLECTION_ID = '66da4caa000ad6801495';
+
 export default function Home() {
   const { user, logout } = useAuth();
   const [reports, setReports] = useState([]);
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [userPincode, setUserPincode] = useState<string | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
   const fetchReports = async () => {
+    if (!userPincode) {
+      console.log("User pincode not set, cannot fetch reports");
+      return;
+    }
+
     try {
       const response = await databases.listDocuments(
         DATABASE_ID,
         COLLECTION_ID,
-        [Query.orderDesc("$createdAt"), Query.limit(10)]
+        [
+          Query.equal("pincode", userPincode),
+          Query.orderDesc("$createdAt"),
+          Query.limit(10)
+        ]
       );
       const parsedReports = response.documents.map((doc) => ({
         ...doc,
@@ -79,10 +91,159 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user && userPincode) {
       fetchReports();
     }
-  }, [user]);
+  }, [user, userPincode]);
+
+  const checkUserProfile = async () => {
+    if (!user) return;
+
+    setIsLoadingProfile(true);
+    try {
+      console.log('Checking user profile for user ID:', user.$id);
+      console.log('Using DATABASE_ID:', DATABASE_ID);
+      console.log('Using COLLECTION_ID:', USER_PROFILES_COLLECTION_ID);
+
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        USER_PROFILES_COLLECTION_ID,
+        [Query.equal('user_id', user.$id)]
+      );
+
+      console.log('Response from listDocuments:', response);
+
+      if (response.documents.length === 0) {
+        console.log('No existing profile found, creating new one');
+        // User profile doesn't exist, create one
+        try {
+          const newProfile = await databases.createDocument(
+            DATABASE_ID,
+            USER_PROFILES_COLLECTION_ID,
+            ID.unique(),
+            {
+              user_id: user.$id,
+              pincode: '', // Set an empty string as the initial value
+            }
+          );
+          console.log('New profile created:', newProfile);
+          setUserPincode(''); // This will ensure the form stays visible
+          toast({
+            title: 'Profile created',
+            description: 'Please set your pincode.',
+            variant: 'default',
+          });
+        } catch (createError) {
+          console.error('Error creating user profile:', createError);
+          if (createError instanceof AppwriteException) {
+            console.error('Appwrite error code:', createError.code);
+            console.error('Appwrite error message:', createError.message);
+            console.error('Appwrite error type:', createError.type);
+          }
+          toast({
+            title: 'Error creating user profile',
+            description: 'Please try again later.',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        console.log('Existing profile found:', response.documents[0]);
+        // User profile exists
+        const existingProfile = response.documents[0];
+        if (existingProfile.pincode === '') {
+          setUserPincode(''); // This will show the form if pincode is empty
+          toast({
+            title: 'Pincode not set',
+            description: 'Please set your pincode.',
+            variant: 'default',
+          });
+        } else {
+          setUserPincode(existingProfile.pincode);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user profile:', error);
+      if (error instanceof AppwriteException) {
+        console.error('Appwrite error code:', error.code);
+        console.error('Appwrite error message:', error.message);
+        console.error('Appwrite error type:', error.type);
+      }
+      toast({
+        title: 'Error checking user profile',
+        description: 'Please check your database and collection IDs.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const UserProfileForm = () => {
+    const [pincode, setPincode] = useState("");
+
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!user) return;
+
+      try {
+        const response = await databases.listDocuments(
+          DATABASE_ID,
+          USER_PROFILES_COLLECTION_ID,
+          [Query.equal('user_id', user.$id)]
+        );
+
+        if (response.documents.length > 0) {
+          // Update existing profile
+          await databases.updateDocument(
+            DATABASE_ID,
+            USER_PROFILES_COLLECTION_ID,
+            response.documents[0].$id,
+            {
+              pincode: pincode,
+            }
+          );
+        } else {
+          // Create new profile
+          await databases.createDocument(
+            DATABASE_ID,
+            USER_PROFILES_COLLECTION_ID,
+            ID.unique(),
+            {
+              user_id: user.$id,
+              pincode: pincode,
+            }
+          );
+        }
+        setUserPincode(pincode); // Update the parent component's state
+        toast({ title: "Profile updated successfully!" });
+        fetchReports(); // Fetch reports for the new pincode
+      } catch (error) {
+        console.error("Error updating user profile:", error);
+        toast({
+          title: "Error updating profile",
+          description: "Please try again later.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    return (
+      <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
+        <h2 className="text-2xl font-bold mb-4">Set Your Pincode</h2>
+        <p className="mb-4 text-gray-600">Please set your pincode to continue using the app.</p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            type="text"
+            placeholder="Pincode"
+            value={pincode}
+            onChange={(e) => setPincode(e.target.value)}
+            required
+          />
+          <Button type="submit" className="w-full">Save Pincode</Button>
+        </form>
+      </div>
+    );
+  };
 
   const ReportForm = () => {
     const [type, setType] = useState("");
@@ -249,14 +410,14 @@ export default function Home() {
             <SelectContent>
               {type === "Hazard" ? (
                 <>
-                  <SelectItem value="car_accident">Car Accident</SelectItem>
-                  <SelectItem value="tree_fallen">Tree Fallen</SelectItem>
+                  <SelectItem value="car accident">Car Accident</SelectItem>
+                  <SelectItem value="tree fallen">Tree Fallen</SelectItem>
                   <SelectItem value="fire">Fire</SelectItem>
-                  <SelectItem value="chemical_spill">Chemical Spill</SelectItem>
-                  <SelectItem value="gas_leak">Gas Leak</SelectItem>
-                  <SelectItem value="electrical_fire">Electrical Fire</SelectItem>
-                  <SelectItem value="building_collapse">Building Collapse</SelectItem>
-                  <SelectItem value="bridge_collapse">Bridge Collapse</SelectItem>
+                  <SelectItem value="chemical spill">Chemical Spill</SelectItem>
+                  <SelectItem value="gas leak">Gas Leak</SelectItem>
+                  <SelectItem value="electrical fire">Electrical Fire</SelectItem>
+                  <SelectItem value="building collapse">Building Collapse</SelectItem>
+                  <SelectItem value="bridge collapse">Bridge Collapse</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                   {/* Add more hazard types */}
                 </>
@@ -264,7 +425,7 @@ export default function Home() {
                 <>
                   <SelectItem value="dam_break">Dam Break</SelectItem>
                   <SelectItem value="tsunami">Tsunami</SelectItem>
-                  <SelectItem value="volcano_eruption">Volcano Eruption</SelectItem>
+                  <SelectItem value="volcano eruption">Volcano Eruption</SelectItem>
                   <SelectItem value="earthquake">Earthquake</SelectItem>
                   <SelectItem value="flood">Flood</SelectItem>
                   <SelectItem value="tornado">Tornado</SelectItem>
@@ -366,7 +527,7 @@ export default function Home() {
                   ? `${user.name} ${user.email.split("@")[0]}`
                   : "User"}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-primary/70">
                 {new Date(report.$createdAt).toLocaleString()}
               </p>
             </div>
@@ -389,7 +550,9 @@ export default function Home() {
               </DialogHeader>
               <DialogFooter>
                 <div className="mx-auto">
-                  <Button onClick={handleFlagConfirm} className="w-full">Confirm</Button>
+                  <Button onClick={handleFlagConfirm} className="w-full">
+                    Confirm
+                  </Button>
                 </div>
               </DialogFooter>
             </DialogContent>
@@ -424,18 +587,31 @@ export default function Home() {
             </span>
           ))}
         </p>
-        <p className="mt-2">{report.description}</p>
 
         <ClientSideMap report={report} />
+        <p className="mt-2">{report.description}</p>
+
         <div className="flex w-full mt-2">
           <Button size="sm">Report same issue</Button>
-          <Button size="icon" variant="ghost" className="ml-auto">
-            <FontAwesomeIcon icon={faCommentAlt} className="w-6 h-6 text-foreground/70"/>
+          <Button size="icon" variant="link" className="ml-auto">
+            <FontAwesomeIcon
+              icon={faCommentAlt}
+              className="w-6 h-6 text-foreground/70"
+            />
           </Button>
         </div>
       </div>
     );
   };
+
+  useEffect(() => {
+    if (user) {
+      checkUserProfile();
+    } else {
+      setIsLoadingProfile(false);
+      setUserPincode("");
+    }
+  }, [user]);
 
   return (
     <div className="bg-background font-[font-family:var(--font-geist-sans)] w-md mx-auto">
@@ -464,29 +640,28 @@ export default function Home() {
       </nav>
       <main>
         <ScrollArea className="min-h-[calc(100vh-128px)] h-full px-4 py-2">
-          <div>
-            {user ? (
-              <>
-                {/* <div className="flex justify-between items-center mb-4">
-                  <p className="text-lg">
-                    Welcome,{" "}
-                    {user.email
-                      ? `${user.name} ${user.email.split("@")[0]}`
-                      : "User"}
-                    !
-                  </p>
-                </div> */}
-                <h2 className="text-xl font-semibold mb-4">Recent Reports</h2>
-                {reports.map((report) => (
-                  <ReportCard key={report.$id} report={report} />
-                ))}
-              </>
+          {user ? (
+            isLoadingProfile ? (
+              <p>Loading profile...</p>
+            ) : userPincode === null || userPincode === "" ? (
+              <UserProfileForm />
             ) : (
-              <p className="text-lg text-center">
-                Please log in to view and submit reports.
-              </p>
-            )}
-          </div>
+              <>
+                <h2 className="text-xl font-semibold mb-4">Recent Reports for {userPincode}</h2>
+                {reports.length > 0 ? (
+                  reports.map((report) => (
+                    <ReportCard key={report.$id} report={report} />
+                  ))
+                ) : (
+                  <p>No reports found for your pincode.</p>
+                )}
+              </>
+            )
+          ) : (
+            <p className="text-lg text-center">
+              Please log in to view and submit reports.
+            </p>
+          )}
         </ScrollArea>
       </main>
       <footer className="border-t-2 border-foreground/10 bg-background">
