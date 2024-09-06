@@ -256,15 +256,51 @@ export default function Home() {
     >([]);
     const [pincode_error, setPincodeError] = useState(null);
     const [description, setDescription] = useState("");
+    const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
 
-    const options = {
-      method: "GET",
-      url: `https://india-pincode-with-latitude-and-longitude.p.rapidapi.com/api/v1/pincode/${pincode}`,
-      headers: {
-        "x-rapidapi-key": "756493b2cfmsh2115bf55dcb256bp10e017jsn0d50ad02fbe9",
-        "x-rapidapi-host":
-          "india-pincode-with-latitude-and-longitude.p.rapidapi.com",
-      },
+    const handlePincodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newPincode = e.target.value;
+      if (newPincode.length <= 6) {
+        setPincode(newPincode);
+        if (newPincode.length === 6) {
+          try {
+            const res = await axios.request({
+              method: "GET",
+              url: `https://india-pincode-with-latitude-and-longitude.p.rapidapi.com/api/v1/pincode/${newPincode}`,
+              headers: {
+                "x-rapidapi-key": "756493b2cfmsh2115bf55dcb256bp10e017jsn0d50ad02fbe9",
+                "x-rapidapi-host": "india-pincode-with-latitude-and-longitude.p.rapidapi.com",
+              },
+            });
+            if (res.data.length === 0) {
+              setPincodeError("Invalid pincode");
+              setFetchedLocalities([]);
+            } else {
+              setPincodeError(null);
+              setFetchedLocalities(res.data);
+            }
+          } catch (error) {
+            console.error("Error fetching localities:", error);
+            setPincodeError("Error fetching localities");
+            setFetchedLocalities([]);
+          }
+        } else {
+          setPincodeError(null);
+          setFetchedLocalities([]);
+        }
+      }
+    };
+
+    const validateForm = () => {
+      const errors: {[key: string]: string} = {};
+      if (!type) errors.type = "Type is required";
+      if (!subtype) errors.subtype = "Subtype is required";
+      if (!severity) errors.severity = "Severity is required";
+      if (!pincode) errors.pincode = "Pincode is required";
+      if (localities.length === 0) errors.localities = "At least one locality is required";
+      
+      setFormErrors(errors);
+      return Object.keys(errors).length === 0;
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -274,6 +310,11 @@ export default function Home() {
           title: "Please log in to submit a report",
           variant: "destructive",
         });
+        return;
+      }
+
+      if (!validateForm()) {
+        // Form is invalid, errors will be displayed
         return;
       }
 
@@ -288,34 +329,38 @@ export default function Home() {
 
         const response = await databases.createDocument(
           DATABASE_ID,
-          COLLECTION_ID,
-          "unique()",
+          POSTS_COLLECTION_ID,
+          ID.unique(),
           {
             type,
             subtype,
             severity,
             pincode,
-            localities: localitiesAsStrings, // Send array of strings
+            localities: localitiesAsStrings,
             description,
             user_id: user.$id,
           }
         );
         console.log("Document created successfully:", response);
-        toast({ title: "Report submitted successfully!" });
+        toast({ 
+          title: "Report submitted successfully!",
+          onDismiss: () => {
+            // Clear the form
+            setType("");
+            setSubtype("");
+            setSeverity("");
+            setPincode("");
+            setLocalities([]);
+            setDescription("");
+            setFormErrors({});
 
-        // Refresh the feed
-        await fetchReports();
+            // Close the dialog
+            setDialogOpen(false);
 
-        // Clear the form
-        setType("");
-        setSubtype("");
-        setSeverity("");
-        setPincode("");
-        setLocalities([]);
-        setDescription("");
-
-        // Close the dialog
-        setDialogOpen(false);
+            // Refresh the feed
+            fetchReports();
+          }
+        });
       } catch (error) {
         console.error("Error submitting report:", error);
         if (error instanceof AppwriteException) {
@@ -333,35 +378,9 @@ export default function Home() {
       }
     };
 
-    const handleSearchPincode = async () => {
-      try {
-        const res = await axios.request(options);
-        console.log(res.data);
-        if (res.data.length == 0) {
-          throw "Pincode invalid!";
-        }
-        setFetchedLocalities(res.data);
-      } catch (error) {
-        console.log(error);
-        setPincodeError(error);
-      }
-    };
-
-    useEffect(() => {
-      console.log(localities);
-    }, [localities]);
-
-    useEffect(() => {
-      if (pincode.length == 6) {
-        handleSearchPincode();
-      } else {
-        setFetchedLocalities([]);
-      }
-    }, [pincode]);
-
-    const handlePincodeChange = (e) => {
-      if (e.target.value.length <= 6) {
-        setPincode(e.target.value);
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
       }
     };
 
@@ -387,12 +406,15 @@ export default function Home() {
 
     return (
       <div className="">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={handleKeyDown}
+          className="space-y-4"
+        >
           <RadioGroup
             value={type}
             onValueChange={setType}
             className="grid grid-cols-2 gap-2"
-            required
           >
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="Hazard" id="hazard" />
@@ -403,6 +425,10 @@ export default function Home() {
               <Label htmlFor="disaster">Disaster</Label>
             </div>
           </RadioGroup>
+          {formErrors.type && (
+            <p className="text-red-500 text-sm">{formErrors.type}</p>
+          )}
+
           <Select value={subtype} onValueChange={setSubtype}>
             <SelectTrigger>
               <SelectValue placeholder="Select type" />
@@ -415,9 +441,15 @@ export default function Home() {
                   <SelectItem value="fire">Fire</SelectItem>
                   <SelectItem value="chemical spill">Chemical Spill</SelectItem>
                   <SelectItem value="gas leak">Gas Leak</SelectItem>
-                  <SelectItem value="electrical fire">Electrical Fire</SelectItem>
-                  <SelectItem value="building collapse">Building Collapse</SelectItem>
-                  <SelectItem value="bridge collapse">Bridge Collapse</SelectItem>
+                  <SelectItem value="electrical fire">
+                    Electrical Fire
+                  </SelectItem>
+                  <SelectItem value="building collapse">
+                    Building Collapse
+                  </SelectItem>
+                  <SelectItem value="bridge collapse">
+                    Bridge Collapse
+                  </SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                   {/* Add more hazard types */}
                 </>
@@ -425,7 +457,9 @@ export default function Home() {
                 <>
                   <SelectItem value="dam_break">Dam Break</SelectItem>
                   <SelectItem value="tsunami">Tsunami</SelectItem>
-                  <SelectItem value="volcano eruption">Volcano Eruption</SelectItem>
+                  <SelectItem value="volcano eruption">
+                    Volcano Eruption
+                  </SelectItem>
                   <SelectItem value="earthquake">Earthquake</SelectItem>
                   <SelectItem value="flood">Flood</SelectItem>
                   <SelectItem value="tornado">Tornado</SelectItem>
@@ -436,6 +470,9 @@ export default function Home() {
               )}
             </SelectContent>
           </Select>
+          {formErrors.subtype && (
+            <p className="text-red-500 text-sm">{formErrors.subtype}</p>
+          )}
 
           <Select value={severity} onValueChange={setSeverity}>
             <SelectTrigger>
@@ -447,6 +484,9 @@ export default function Home() {
               <SelectItem value="high">High</SelectItem>
             </SelectContent>
           </Select>
+          {formErrors.severity && (
+            <p className="text-red-500 text-sm">{formErrors.severity}</p>
+          )}
 
           <Input
             type="number"
@@ -455,14 +495,28 @@ export default function Home() {
             value={pincode}
             onChange={handlePincodeChange}
           />
-          {pincode_error && <p className="text-red-600">{pincode_error}</p>}
-          {/* <Button type="button" onClick={() => handleSearchPincode()}>
-          Search your area
-        </Button> */}
+          {pincode_error && (
+            <p className="text-red-500 text-sm">{pincode_error}</p>
+          )}
+          {formErrors.pincode && (
+            <p className="text-red-500 text-sm">{formErrors.pincode}</p>
+          )}
 
-          {/* Add checkbox list for localities based on pincode */}
-          {/* This is a placeholder, you'll need to implement locality fetching based on pincode */}
+          {/* Locality checkboxes */}
           <div className="flex flex-wrap gap-2 items-center">
+            <Checkbox
+              id="current-location"
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  handleGetCurrentLocation();
+                } else {
+                  setLocalities((prev) =>
+                    prev.filter((l) => l.name !== "Current Location")
+                  );
+                }
+              }}
+            />
+            <Label htmlFor="current-location">Add current location</Label>
             {fetchedLocalities.map((location, index) => (
               <div key={index} className="flex items-center gap-2">
                 <Checkbox
@@ -485,15 +539,13 @@ export default function Home() {
                 <Label htmlFor={`locality${index}`}>{location.area}</Label>
               </div>
             ))}
-            {type === "Hazard" && (
-              <Button type="button" onClick={handleGetCurrentLocation}>
-                Add current location
-              </Button>
-            )}
           </div>
+          {formErrors.localities && (
+            <p className="text-red-500 text-sm">{formErrors.localities}</p>
+          )}
 
           <Textarea
-            placeholder="Description"
+            placeholder="Description (optional)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
