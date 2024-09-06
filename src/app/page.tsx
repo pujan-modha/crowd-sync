@@ -698,7 +698,7 @@ export default function Home() {
 
     return (
       <Drawer open={commentDrawerOpen} onOpenChange={setCommentDrawerOpen}>
-        <DrawerContent>
+        <DrawerContent className="max-w-md mx-auto">
           <DrawerHeader>
             <DrawerTitle>Comments</DrawerTitle>
           </DrawerHeader>
