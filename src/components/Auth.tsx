@@ -14,7 +14,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 
-export function Auth() {
+export function Auth({ onClose }: { onClose: () => void }) {
   const { sendMagicLink } = useAuth();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,6 +28,7 @@ export function Auth() {
         title: "Login Link Sent",
         description: "Please check your email for the login link.",
       });
+      onClose(); // Close the dialog after successful submission
     } catch (error) {
       console.error("Authentication error:", error);
       toast({

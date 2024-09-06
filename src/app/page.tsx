@@ -761,12 +761,12 @@ export default function Home() {
     return (
       <div className="bg-white border border-foreground/10 shadow rounded-lg px-4 pt-4 pb-2 mb-4 font-[family-name:var(--font-geist-sans)]">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center">
+          <div className="flex items-center -mb-2">
             <FontAwesomeIcon
               icon={faUser}
               className="w-6 h-6 mr-2 rounded-full bg-primary/10 p-2 text-foreground"
             />
-            <div className="my-auto">
+            <div className="my-auto pb-2">
               <p>
                 {user.email
                   ? `${user.name} ${user.email.split("@")[0]}`
@@ -900,14 +900,13 @@ export default function Home() {
               )}
             </DialogTrigger>
             <DialogContent className="max-w-md mx-auto">
-              {/* <DialogTitle/> */}
               {user ? (
                 <ReportForm
                   setDialogOpen={setDialogOpen}
                   fetchReports={fetchReports}
                 />
               ) : (
-                <Auth />
+                <Auth onClose={() => setDialogOpen(false)} />
               )}
             </DialogContent>
           </Dialog>
@@ -936,7 +935,7 @@ export default function Home() {
             )
           ) : (
             <div className="flex flex-col justify-center items-center h-full">
-              <div className="flex h-screen">
+              <div className="flex h-[80vh]">
                 <div className="flex flex-col">
                   <div className="flex mx-auto mt-auto">
                     <p className="text-xl font-semibold text-foreground">
@@ -974,7 +973,7 @@ export default function Home() {
                             fetchReports={fetchReports}
                           />
                         ) : (
-                          <Auth />
+                          <Auth onClose={() => setDialogOpen(false)} />
                         )}
                       </DialogContent>
                     </Dialog>
