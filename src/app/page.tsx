@@ -19,9 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { databases, account, DATABASE_ID, COLLECTION_ID } from "@/lib/appwrite";
+import { databases, account, DATABASE_ID } from "@/lib/appwrite";
 import { AppwriteException, Query, ID } from "appwrite";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -659,76 +659,88 @@ export default function Home() {
     }
   };
 
-  const handleCommentSubmit = async (e) => {
-    e.preventDefault();
-    if (!user || !currentPostId || !newComment.trim()) return;
+  const handleCommentSubmit = useCallback(
+    async (e, comment) => {
+      e.preventDefault();
+      if (!user || !currentPostId || !comment.trim()) return;
 
-    try {
-      await databases.createDocument(
-        DATABASE_ID,
-        COMMENTS_COLLECTION_ID,
-        ID.unique(),
-        {
-          post_id: currentPostId,
-          user_id: user.$id,
-          content: newComment.trim(),
-          created_at: new Date().toISOString(),
-        }
-      );
-      setNewComment("");
-      fetchComments(currentPostId);
-      toast({ title: "Comment added successfully" });
-    } catch (error) {
-      console.error("Error adding comment:", error);
-      toast({ title: "Error adding comment", variant: "destructive" });
-    }
-  };
-
-  const CommentDrawer = () => (
-    <Drawer open={commentDrawerOpen} onOpenChange={setCommentDrawerOpen}>
-      <DrawerContent>
-        <DrawerHeader>
-          <DrawerTitle>Comments</DrawerTitle>
-        </DrawerHeader>
-        <div className="p-4">
-          <form onSubmit={handleCommentSubmit} className="mb-4">
-            <Input
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
-            />
-            <Button type="submit" className="mt-2">
-              Post Comment
-            </Button>
-          </form>
-          <div className="space-y-4">
-            {comments.map((comment) => (
-              <div key={comment.$id} className="pb-2">
-                <div className="flex items-center">
-                  <FontAwesomeIcon
-                    icon={faUser}
-                    className="w-5 h-5 mr-2 rounded-full bg-primary/10 p-2 text-foreground"
-                  />
-                  <div className="mb-2">
-                    <p className="items-center">
-                      {comment.user_id
-                        ? `${user.name} ${user.email.split("@")[0]}`
-                        : "User"}
-
-                      <span className="text-xs text-primary/70 ml-1">
-                        ({new Date(comment.$createdAt).toLocaleString()})
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <p className="border-b pb-1 ml-11">{comment.content}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </DrawerContent>
-    </Drawer>
+      try {
+        await databases.createDocument(
+          DATABASE_ID,
+          COMMENTS_COLLECTION_ID,
+          ID.unique(),
+          {
+            post_id: currentPostId,
+            user_id: user.$id,
+            content: comment.trim(),
+            created_at: new Date().toISOString(),
+          }
+        );
+        setNewComment("");
+        fetchComments(currentPostId);
+        toast({ title: "Comment added successfully" });
+      } catch (error) {
+        console.error("Error adding comment:", error);
+        toast({ title: "Error adding comment", variant: "destructive" });
+      }
+    },
+    [user, currentPostId]
   );
+
+  const CommentDrawer = () => {
+    const [localComment, setLocalComment] = useState("");
+
+    const handleLocalCommentSubmit = (e) => {
+      handleCommentSubmit(e, localComment);
+      setLocalComment("");
+    };
+
+    return (
+      <Drawer open={commentDrawerOpen} onOpenChange={setCommentDrawerOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>Comments</DrawerTitle>
+          </DrawerHeader>
+          <div className="p-4">
+            <form onSubmit={handleLocalCommentSubmit} className="mb-4">
+              <Input
+                value={localComment}
+                onChange={(e) => setLocalComment(e.target.value)}
+                placeholder="Add a comment..."
+              />
+              <Button type="submit" className="mt-2">
+                Post Comment
+              </Button>
+            </form>
+            <div className="space-y-4">
+              {comments.map((comment) => (
+                <div key={comment.$id} className="pb-2">
+                  <div className="flex items-center">
+                    <FontAwesomeIcon
+                      icon={faUser}
+                      className="w-5 h-5 mr-2 rounded-full bg-primary/10 p-2 text-foreground"
+                    />
+                    <div className="mb-2">
+                      <p className="items-center">
+                        {comment.user_id
+                          ? `${user.name} ${user.email.split("@")[0]}`
+                          : "User"}
+
+                        <span className="text-xs text-primary/70 ml-1">
+                          ({new Date(comment.$createdAt).toLocaleString()})
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <p className="border-b pb-1 ml-11">{comment.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  };
 
   const ReportCard = ({ report }) => {
     const [dialogOpen, setDialogOpen] = useState(false);
